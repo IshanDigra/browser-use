@@ -409,7 +409,7 @@ class DOMTreeSerializer:
 			elif any('@' in val for val in option_values[:5] if val):
 				format_hint = 'email addresses'
 
-		return {'count': len(options), 'first_options': first_options, 'format_hint': format_hint}
+		return {'count': len(options), 'first_options': first_options, 'format_hint': format_hint, "all_options": options}
 
 	def _is_interactive_cached(self, node: EnhancedDOMTreeNode) -> bool:
 		"""Cached version of clickable element detection to avoid redundant calls."""
