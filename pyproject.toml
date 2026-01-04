@@ -1,5 +1,5 @@
 [project]
-name = "browser-use"
+name = "optexity-browser-use"
 description = "Make websites accessible for AI agents"
 authors = [{ name = "Gregor Zunic" }]
 version = "0.9.5"
