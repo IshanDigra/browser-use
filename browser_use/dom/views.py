@@ -817,6 +817,7 @@ class SerializedDOMState:
 	def llm_representation(
 		self,
 		include_attributes: list[str] | None = None,
+		remove_empty_nodes: bool = False,
 	) -> str:
 		"""Kinda ugly, but leaving this as an internal method because include_attributes are a parameter on the agent, so we need to leave it as a 2 step process"""
 		from browser_use.dom.serializer.serializer import DOMTreeSerializer
@@ -826,7 +827,21 @@ class SerializedDOMState:
 
 		include_attributes = include_attributes or DEFAULT_INCLUDE_ATTRIBUTES
 
-		return DOMTreeSerializer.serialize_tree(self._root, include_attributes)
+		formatted_text, is_interactive = DOMTreeSerializer.serialize_tree(self._root, include_attributes, remove_empty_nodes=remove_empty_nodes)
+		final_text = '\n'.join(formatted_text)
+		if remove_empty_nodes:
+			'''
+			remove extra tabs from the beginning of the lines
+			'''
+			formatted_text = final_text.split('\n')
+			for i in range(1,len(formatted_text)):
+				prev_tabs = len(formatted_text[i-1]) - len(formatted_text[i-1].lstrip('\t'))
+				curr_tabs = len(formatted_text[i]) - len(formatted_text[i].lstrip('\t'))
+				while curr_tabs - prev_tabs>1:
+					formatted_text[i] = formatted_text[i][1:]
+					curr_tabs = len(formatted_text[i]) - len(formatted_text[i].lstrip('\t'))
+			final_text = '\n'.join(formatted_text)
+		return final_text
 
 	@observe_debug(ignore_input=True, ignore_output=True, name='eval_representation')
 	def eval_representation(

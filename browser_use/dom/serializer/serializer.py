@@ -792,19 +792,22 @@ class DOMTreeSerializer:
 		return False
 
 	@staticmethod
-	def serialize_tree(node: SimplifiedNode | None, include_attributes: list[str], depth: int = 0) -> str:
+	def serialize_tree(node: SimplifiedNode | None, include_attributes: list[str], depth: int = 0, remove_empty_nodes: bool = False) -> (list[str], bool):
 		"""Serialize the optimized tree to string format."""
 		if not node:
-			return ''
+			return [], False
+
+		is_empty_node = False
 
 		# Skip rendering excluded nodes, but process their children
 		if hasattr(node, 'excluded_by_parent') and node.excluded_by_parent:
 			formatted_text = []
 			for child in node.children:
-				child_text = DOMTreeSerializer.serialize_tree(child, include_attributes, depth)
+				child_formatted_text, child_is_interactive = DOMTreeSerializer.serialize_tree(child, include_attributes, depth, remove_empty_nodes)
+				child_text = '\n'.join(child_formatted_text)
 				if child_text:
 					formatted_text.append(child_text)
-			return '\n'.join(formatted_text)
+			return formatted_text, node.is_interactive
 
 		formatted_text = []
 		depth_str = depth * '\t'
@@ -814,10 +817,11 @@ class DOMTreeSerializer:
 			# Skip displaying nodes marked as should_display=False
 			if not node.should_display:
 				for child in node.children:
-					child_text = DOMTreeSerializer.serialize_tree(child, include_attributes, depth)
+					child_formatted_text, child_is_interactive = DOMTreeSerializer.serialize_tree(child, include_attributes, depth, remove_empty_nodes)
+					child_text = '\n'.join(child_formatted_text)
 					if child_text:
 						formatted_text.append(child_text)
-				return '\n'.join(formatted_text)
+				return formatted_text, node.is_interactive
 
 			# Special handling for SVG elements - show the tag but collapse children
 			if node.original_node.tag_name.lower() == 'svg':
@@ -843,7 +847,7 @@ class DOMTreeSerializer:
 				line += ' /> <!-- SVG content collapsed -->'
 				formatted_text.append(line)
 				# Don't process children for SVG
-				return '\n'.join(formatted_text)
+				return formatted_text, node.is_interactive
 
 			# Add element if clickable, scrollable, or iframe
 			is_any_scrollable = node.original_node.is_actually_scrollable or node.original_node.is_scrollable
@@ -936,6 +940,14 @@ class DOMTreeSerializer:
 					scroll_info_text = node.original_node.get_scroll_info_text()
 					if scroll_info_text:
 						line += f' ({scroll_info_text})'
+				else:
+					'''
+					We mark the node as empty if it has no attributes. like <button />. 
+					But if it has some attributes, we don't mark it as empty. Like <button class="btn btn-primary">Login</button>.
+					We also don't touch scroll stuff as I do not know about that.
+					'''
+					if not attributes_html_str:
+						is_empty_node = True
 
 				formatted_text.append(line)
 
@@ -950,7 +962,8 @@ class DOMTreeSerializer:
 
 			# Process shadow DOM children
 			for child in node.children:
-				child_text = DOMTreeSerializer.serialize_tree(child, include_attributes, next_depth)
+				child_formatted_text, child_is_interactive = DOMTreeSerializer.serialize_tree(child, include_attributes, next_depth, remove_empty_nodes)
+				child_text = '\n'.join(child_formatted_text)
 				if child_text:
 					formatted_text.append(child_text)
 
@@ -972,13 +985,48 @@ class DOMTreeSerializer:
 
 		# Process children (for non-shadow elements)
 		if node.original_node.node_type != NodeType.DOCUMENT_FRAGMENT_NODE:
+			child_texts: list[str] = []
+			child_is_interactives: list[bool] = []
 			for child in node.children:
-				child_text = DOMTreeSerializer.serialize_tree(child, include_attributes, next_depth)
+				child_formatted_text, child_is_interactive = DOMTreeSerializer.serialize_tree(child, include_attributes, next_depth, remove_empty_nodes)
+				child_text = '\n'.join(child_formatted_text)
+				if child_text!='':
+					child_texts.append(child_text)
+					child_is_interactives.append(child_is_interactive)
+
+			if remove_empty_nodes:
+				if is_empty_node and depth >= 0:
+					
+					if len(child_texts) == 1 and len(formatted_text) > 0:
+						if child_is_interactives[0]:
+							formatted_text.pop()
+
+							'''
+							bring child one level up as this is the new level of child
+							'''
+							if child_texts[0].startswith('\t'):
+								temp = [a[1:] for a in child_texts[0].split("\n")]
+								child_texts[0] = "\n".join(temp)
+						
+
+					if len(child_texts) > 1 and len(formatted_text) > 0:
+						if all(child_is_interactives):
+							formatted_text.pop()
+
+							'''
+							bring all children one level up as this is the new level of child if they start with a tab
+							'''
+							if all([child_text.startswith('\t') for child_text in child_texts]):
+								for i in range(len(child_texts)):
+									temp = [a[1:] for a in child_texts[i].split("\n")]
+									child_texts[i] = "\n".join(temp)
+
+			for child_text in child_texts:
 				if child_text:
 					formatted_text.append(child_text)
 
-		return '\n'.join(formatted_text)
-
+		return formatted_text, node.is_interactive
+		
 	@staticmethod
 	def _build_attributes_string(node: EnhancedDOMTreeNode, include_attributes: list[str], text: str) -> str:
 		"""Build the attributes string for an element."""
