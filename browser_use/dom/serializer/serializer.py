@@ -792,7 +792,7 @@ class DOMTreeSerializer:
 		return False
 
 	@staticmethod
-	def serialize_tree(node: SimplifiedNode | None, include_attributes: list[str], depth: int = 0, remove_empty_nodes: bool = False) -> (list[str], bool):
+	def serialize_tree(node: SimplifiedNode | None, include_attributes: list[str], depth: int = 0, remove_empty_nodes: bool = False) -> tuple[list[str], bool]:
 		"""Serialize the optimized tree to string format."""
 		if not node:
 			return [], False
@@ -994,32 +994,20 @@ class DOMTreeSerializer:
 					child_texts.append(child_text)
 					child_is_interactives.append(child_is_interactive)
 
-			if remove_empty_nodes:
-				if is_empty_node and depth >= 0:
+			if remove_empty_nodes and is_empty_node and depth >= 0:
 					
-					if len(child_texts) == 1 and len(formatted_text) > 0:
-						if child_is_interactives[0]:
-							formatted_text.pop()
 
-							'''
-							bring child one level up as this is the new level of child
-							'''
-							if child_texts[0].startswith('\t'):
-								temp = [a[1:] for a in child_texts[0].split("\n")]
-								child_texts[0] = "\n".join(temp)
-						
+				if len(child_texts) >= 1 and len(formatted_text) > 0:
+					if all(child_is_interactives):
+						formatted_text.pop()
 
-					if len(child_texts) > 1 and len(formatted_text) > 0:
-						if all(child_is_interactives):
-							formatted_text.pop()
-
-							'''
-							bring all children one level up as this is the new level of child if they start with a tab
-							'''
-							if all([child_text.startswith('\t') for child_text in child_texts]):
-								for i in range(len(child_texts)):
-									temp = [a[1:] for a in child_texts[i].split("\n")]
-									child_texts[i] = "\n".join(temp)
+						'''
+						bring all children one level up as this is the new level of child if they start with a tab
+						'''
+						if all([child_text.startswith('\t') for child_text in child_texts]):
+							for i in range(len(child_texts)):
+								temp = [a[1:] for a in child_texts[i].split("\n")]
+								child_texts[i] = "\n".join(temp)
 
 			for child_text in child_texts:
 				if child_text:
