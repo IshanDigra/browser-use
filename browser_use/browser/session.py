@@ -1296,7 +1296,7 @@ class BrowserSession(BaseModel):
 		# from browser_use.browser.crash_watchdog import CrashWatchdog
 		from browser_use.browser.watchdogs.default_action_watchdog import DefaultActionWatchdog
 		from browser_use.browser.watchdogs.dom_watchdog import DOMWatchdog
-		from browser_use.browser.watchdogs.downloads_watchdog import DownloadsWatchdog
+		# from browser_use.browser.watchdogs.downloads_watchdog import DownloadsWatchdog
 		from browser_use.browser.watchdogs.local_browser_watchdog import LocalBrowserWatchdog
 		from browser_use.browser.watchdogs.permissions_watchdog import PermissionsWatchdog
 		from browser_use.browser.watchdogs.popups_watchdog import PopupsWatchdog
@@ -1313,14 +1313,14 @@ class BrowserSession(BaseModel):
 		# self._crash_watchdog.attach_to_session()
 
 		# Initialize DownloadsWatchdog
-		DownloadsWatchdog.model_rebuild()
-		self._downloads_watchdog = DownloadsWatchdog(event_bus=self.event_bus, browser_session=self)
+		# DownloadsWatchdog.model_rebuild()
+		# self._downloads_watchdog = DownloadsWatchdog(event_bus=self.event_bus, browser_session=self)
 		# self.event_bus.on(BrowserLaunchEvent, self._downloads_watchdog.on_BrowserLaunchEvent)
 		# self.event_bus.on(TabCreatedEvent, self._downloads_watchdog.on_TabCreatedEvent)
 		# self.event_bus.on(TabClosedEvent, self._downloads_watchdog.on_TabClosedEvent)
 		# self.event_bus.on(BrowserStoppedEvent, self._downloads_watchdog.on_BrowserStoppedEvent)
 		# self.event_bus.on(NavigationCompleteEvent, self._downloads_watchdog.on_NavigationCompleteEvent)
-		self._downloads_watchdog.attach_to_session()
+		# self._downloads_watchdog.attach_to_session()
 		if self.browser_profile.auto_download_pdfs:
 			self.logger.debug('📄 PDF auto-download enabled for this session')
 
