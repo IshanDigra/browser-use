@@ -454,6 +454,7 @@ class DomService:
 		initial_html_frames: list[EnhancedDOMTreeNode] | None = None,
 		initial_total_frame_offset: DOMRect | None = None,
 		iframe_depth: int = 0,
+		include_full_page: bool = False,
 	) -> EnhancedDOMTreeNode:
 		"""Get the DOM tree for a specific target.
 
@@ -715,6 +716,9 @@ class DomService:
 							dom_tree_node.content_document = content_document
 							dom_tree_node.content_document.parent_node = dom_tree_node
 
+			if include_full_page:
+				dom_tree_node.is_visible = True
+
 			return dom_tree_node
 
 		enhanced_dom_tree_node = await _construct_enhanced_node(dom_tree['root'], initial_html_frames, initial_total_frame_offset)
@@ -723,7 +727,8 @@ class DomService:
 
 	@observe_debug(ignore_input=True, ignore_output=True, name='get_serialized_dom_tree')
 	async def get_serialized_dom_tree(
-		self, previous_cached_state: SerializedDOMState | None = None
+		self, previous_cached_state: SerializedDOMState | None = None, 
+		include_full_page: bool = False,
 	) -> tuple[SerializedDOMState, EnhancedDOMTreeNode, dict[str, float]]:
 		"""Get the serialized DOM tree representation for LLM consumption.
 
@@ -733,7 +738,7 @@ class DomService:
 
 		# Use current target (None means use current)
 		assert self.browser_session.current_target_id is not None
-		enhanced_dom_tree = await self.get_dom_tree(target_id=self.browser_session.current_target_id)
+		enhanced_dom_tree = await self.get_dom_tree(target_id=self.browser_session.current_target_id, include_full_page=include_full_page)
 
 		start = time.time()
 		serialized_dom_state, serializer_timing = DOMTreeSerializer(

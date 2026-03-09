@@ -366,7 +366,7 @@ class DOMWatchdog(BaseWatchdog):
 					else None
 				)
 
-				dom_task = asyncio.create_task(self._build_dom_tree_without_highlights(previous_state))
+				dom_task = asyncio.create_task(self._build_dom_tree_without_highlights(previous_state, include_full_page=event.include_full_page))
 
 			# Start clean screenshot task if requested (without JS highlights)
 			if event.include_screenshot:
@@ -550,7 +550,7 @@ class DOMWatchdog(BaseWatchdog):
 
 	@time_execution_async('build_dom_tree_without_highlights')
 	@observe_debug(ignore_input=True, ignore_output=True, name='build_dom_tree_without_highlights')
-	async def _build_dom_tree_without_highlights(self, previous_state: SerializedDOMState | None = None) -> SerializedDOMState:
+	async def _build_dom_tree_without_highlights(self, previous_state: SerializedDOMState | None = None, include_full_page: bool = False) -> SerializedDOMState:
 		"""Build DOM tree without injecting JavaScript highlights (for parallel execution)."""
 		try:
 			self.logger.debug('🔍 DOMWatchdog._build_dom_tree_without_highlights: STARTING DOM tree build')
@@ -570,7 +570,7 @@ class DOMWatchdog(BaseWatchdog):
 			self.logger.debug('🔍 DOMWatchdog._build_dom_tree_without_highlights: Calling DomService.get_serialized_dom_tree...')
 			start = time.time()
 			self.current_dom_state, self.enhanced_dom_tree, timing_info = await self._dom_service.get_serialized_dom_tree(
-				previous_cached_state=previous_state,
+				previous_cached_state=previous_state, include_full_page=include_full_page,
 			)
 			end = time.time()
 			self.logger.debug(
