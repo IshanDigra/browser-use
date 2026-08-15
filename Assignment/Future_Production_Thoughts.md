@@ -25,46 +25,24 @@ The naive key is `hash(url + task_text)`. Two refinements matter:
 
 ## 4. Proposed architecture
 
-```
-agentic_task node    | Cache Lookup Service  |
-execution request -> | key = hash(url,       |
-                     | task_text, dom_fingerprint) |
-                     
-                       hit |       | miss
-                           v       v
-               | Replay cached,  | | Run agentic (existing     |
-               | parameterized   | | Optexity path) + Phase    |
-               | automation      | | 2 caching hook            |
-               
-                       | node fails            |
-                       v                       v
-               | Self-healing loop | | Filter + Converter      |
-               | (Phase 7b, as a   | | (Phases 3-4) produce    |
-               | standing service, | | a *candidate* automation|
-               | not a one-shot)   | 
-               
-                                               |
-                                               v
-                                 | Promotion Gate:           |
-                                 | shadow-run candidate N    |
-                                 | times before it can       |
-                                 | replace the agentic path  |
-                                 
-                                               | passes threshold
-                                               v
-               | Two-tier Production Cache Store (Section 7) |
-               | - Redis: fast key->pointer lookup, TTL, counters|
-               | - Postgres: the actual automation_json + status |
-               |   (same DB family as Optexity's existing    |
-               |    `Task.automation` store, per             |
-               |    `optexity_codebase_understand.md`)       |
-               
-                                       | feeds
-                                       v
-               | Task Analytics (already exists on the dashboard)|
-               | - reused as the staleness signal: rising failure|
-               | rate on a cached node -> auto-invalidate -> next|
-               | run misses cache -> re-learns via agentic + recache|
+```mermaid
+graph TD;
+    Req[agentic_task node execution request] --> Lookup[Cache Lookup Service<br/>key = hash(url, task_text, dom_fingerprint)]
+
+    Lookup -- hit --> Replay[Replay cached, parameterized automation]
+    Lookup -- miss --> RunAgentic[Run agentic + Phase 2 caching hook]
+
+    RunAgentic --> Filter[Filter + Converter<br/>produce *candidate* automation]
+
+    Replay -- node fails --> SelfHeal[Self-healing loop<br/>Phase 7b]
+
+    Filter --> Promo[Promotion Gate:<br/>shadow-run candidate N times]
+
+    Promo -- passes threshold --> DB[Two-tier Production Cache Store:<br/>Redis: lookup, TTL<br/>Postgres: automation_json, status]
+
+    DB -- feeds --> Analytics[Task Analytics<br/>Dashboard]
+
+    Analytics -- auto-invalidate on fail rate --> MissCache[Next run misses cache<br/>re-learns via agentic + recache]
 ```
 
 The deliberate design choice here: **reuse what Optexity already has** (the automation store behind `Task.automation`, and the existing Task Analytics dashboard) rather

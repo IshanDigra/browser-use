@@ -2,6 +2,25 @@
 
 This changelog covers the implementation of the memory/caching layer for browser-use as specified in the assignment. The goal was to run an agentic task once, cache the steps taken, filter out redundant steps, and convert them into a deterministic Optexity automation that replays without LLM calls.
 
+## Architecture Overview
+
+```mermaid
+graph TD;
+    A[Agentic Task Run] -->|browser-use executes| B(Caching Hook);
+    B -->|Resolves DOM, writes to JSONL| C[cache.jsonl];
+    C -->|Reads raw steps| D(Filter Redundant Steps);
+    D -->|Drops failures, deduplicates| E[Filtered Steps];
+    E -->|Maps to Optexity Schema| F(Cache to Automation Converter);
+    F -->|Validates Pydantic Models| G[test_automation_cached.json];
+
+    H[Replay Harness] -->|Executes deterministic automation| G;
+
+    subgraph Self-Healing Loop
+      H -->|Node Fails| I[Single-node agentic task];
+      I -->|Recache| B;
+    end
+```
+
 ## What Was Required
 1.  **Caching Hook (Phase 2):** Implement a hook in `browser-use` to capture the actions taken by the agent, resolving the DOM elements to stable locators based on Optexity's priority order (role/label > text > css > xpath).
 2.  **Filtering Redundant Steps (Phase 3):** Drop failed steps and keep only the last action for repeated interactions (e.g., typing into the same field multiple times).
