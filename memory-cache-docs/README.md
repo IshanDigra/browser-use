@@ -26,7 +26,7 @@ the LLM saw, but the durable locator that index resolved to.
 This branch is cut from the **`optexity` branch** (`optexity-browser-use 0.9.5.4`), not `main`.
 `main` is a copy of public browser-use `0.11.4`, which `optexity` cannot drive — it lacks API such as
 `get_browser_state_summary(include_full_page=...)`, and an agentic task run against it silently does
-nothing. See [05_setup_guide_feedback.md](05_setup_guide_feedback.md) §1.
+nothing.
 
 Consequently the PR targets `optexity`. Against `main` the diff would be 198 files and −34,628 lines,
 because `main` is a different lineage.
@@ -43,4 +43,4 @@ schema into this repo.
 | [02_design_decisions_and_tradeoffs.md](02_design_decisions_and_tradeoffs.md) | Every non-obvious choice and the alternative rejected |
 | [03_trial_run_results.md](03_trial_run_results.md) | Real caches, generated automations, measured numbers |
 | [04_future_production_considerations.md](04_future_production_considerations.md) | What is missing: there is no cache *lookup* step yet |
-| [05_setup_guide_feedback.md](05_setup_guide_feedback.md) | Four setup blockers that fail silently |
+| [05_setup_guide_feedback.md](05_setup_guide_feedback.md) | Setup notes: two things that fail silently, worth adding to the brief |
