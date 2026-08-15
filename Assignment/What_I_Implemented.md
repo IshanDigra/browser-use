@@ -31,7 +31,7 @@ graph TD;
     -   LLM-assisted auto-build to generate the automation instead of a hardcoded mapping script.
     -   Iterative recache/self-healing loop to fall back to the agent for only the failing node if a deterministic node fails.
 
-## How We Implemented It
+## How I Implemented It
 
 ### 1. Caching Hook (`browser_use/memory_cache/choke.py`)
 -   Created a `cached_execute_action` decorator to wrap the `execute_action` method in `Registry`.
