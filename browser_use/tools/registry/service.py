@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, RootModel, create_model
 from browser_use.browser import BrowserSession
 from browser_use.filesystem.file_system import FileSystem
 from browser_use.llm.base import BaseChatModel
+from browser_use.memory_cache.choke import cached_execute_action
 from browser_use.observability import observe_debug
 from browser_use.telemetry.service import ProductTelemetry
 from browser_use.tools.registry.views import (
@@ -308,6 +309,7 @@ class Registry(Generic[Context]):
 
 	@observe_debug(ignore_input=True, ignore_output=True, name='execute_action')
 	@time_execution_async('--execute_action')
+	@cached_execute_action
 	async def execute_action(
 		self,
 		action_name: str,
