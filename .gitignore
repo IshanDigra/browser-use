@@ -82,3 +82,10 @@ product_extraction.ipynb
 product_extraction.py
 *report.md
 plot.py
+
+# --- memory-cache layer: local run artifacts ---
+.env.bak
+cache*.jsonl
+test_automation*.json
+Assignment/
+memory-cache-docs/02_design_decisions_and_tradeoffs.md
