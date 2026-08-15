@@ -2,7 +2,7 @@
 
 ## Interception Strategy
 
-**Chosen:** wrap the single controller/registry dispatch method that every action funnels through (`browser_use_codebase_understanding.md` §4), rather than editing each action function individually.
+**Chosen:** wrap the single controller/registry dispatch method that every action funnels through, rather than editing each action function individually.
 
 **Alternatives considered:**
 - *Patch every action function* (`click_element_by_index`, `input_text`, etc. individually). Rejected: N places to keep in sync instead of 1; any new action type added to the fork silently escapes caching until someone remembers to patch it too.
@@ -10,7 +10,7 @@
 
 ## Selector Capture
 
-**Chosen:** capture whatever real locator information (role+name, label, test-id, text, CSS, XPath - in that preference order) browser-use resolved the chosen index to, mirroring Optexity's own documented hierarchy (`01_...md` §5).
+**Chosen:** capture whatever real locator information (role+name, label, test-id, text, CSS, XPath - in that preference order) browser-use resolved the chosen index to, mirroring Optexity's own documented hierarchy.
 
 **Alternatives considered:**
 - *Cache the raw `[n]` index and replay by index.* Rejected outright: the index is a transient artifact of one DOM snapshot. A slightly different render (ad loaded, popup present, lazy content) reassigns indices, so "click index 67" becomes silently wrong on replay - this defeats the entire "deterministic and reliable" goal, it would just be trading LLM non-determinism for DOM-ordering non-determinism.
@@ -28,7 +28,7 @@ The goal doc itself says "you can just log the cache" for the core assignment - 
 
 ## Deduplication Logic
 
-**Chosen:** two explicit rules - drop failed attempts, and last-write-wins for repeated writes to the same resolved selector (`02_implementation_plan.md` Phase 3).
+**Chosen:** two explicit rules - drop failed attempts, and last-write-wins for repeated writes to the same resolved selector.
 
 **Alternatives considered:**
 - *Similarity-clustering or embedding-based dedup* of action sequences. Rejected: it would be its own non-deterministic component inside a pipeline whose entire point is removing non-determinism - and it's unexplainable in a demo Q&A ("why did it drop that step?" -> "the model said so" is a worse answer than a two-line rule you can read aloud).
