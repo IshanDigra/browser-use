@@ -11,6 +11,7 @@ css > xpath.
 """
 
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -18,8 +19,13 @@ from browser_use.memory_cache.models import CachedStep, SelectorStrategy
 
 logger = logging.getLogger(__name__)
 
-CACHE_PATH = Path('cache.jsonl')
+# Relative to the working directory of the process running the agent. Settable so that consecutive
+# runs can be captured separately without copying files between them.
+CACHE_PATH = Path(os.environ.get('OPTEXITY_CACHE_PATH', 'cache.jsonl'))
 
+# Per-process state. Each automation runs in a fresh worker subprocess, so these reset naturally
+# between runs; within a run, several agentic_task nodes deliberately share one cache and one
+# continuous step numbering.
 _step_counter = 0
 _cache_started = False
 
@@ -115,7 +121,15 @@ def cached_execute_action(original_execute_action):
 
 		value = None
 		if isinstance(params, dict):
-			value = params.get('text') or params.get('url') or params.get('query') or params.get('value')
+			# 'code' is the evaluate action's JavaScript. Without it an evaluate step records as a
+			# blank row and the work it performed is invisible to the converter.
+			value = (
+				params.get('text')
+				or params.get('url')
+				or params.get('query')
+				or params.get('code')
+				or params.get('value')
+			)
 
 		success = True
 		if getattr(result, 'error', None):
