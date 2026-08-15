@@ -1,12 +1,10 @@
 # From POC Cache to Production-Grade Architecture
 
-This doc answers a question the hackathon assignment doesn't ask directly but the demo almost certainly will: *what you built is a local file and a one-shot script - what would this actually look like as a product feature?*
-
-## 1. What the POC uses today (recap)
+## Current Architecture (POC)
 
 Per `03_design_decisions_and_tradeoffs.md` §3: a single append-only `cache.jsonl` file on local disk, written once during one agentic run, read once by a manual conversion script (`02_implementation_plan.md` Phase 4), producing one static `test_automation_cached.json`. There is no lookup step - nothing checks "have we cached this before?" before running agentically - and nothing persists past the local filesystem. That scope was correct for a 1-3 hour build; it is not a caching *system*, just a capture-and-convert pipeline. Everything below is the gap between the two.
 
-## 2. What's missing for production
+## Production Requirements
 
 | Gap | Why it matters |
 |---|---|
@@ -16,40 +14,40 @@ Per `03_design_decisions_and_tradeoffs.md` §3: a single append-only `cache.json
 | No staleness handling | Sites change. A cached automation that was correct last month can silently start failing (or worse, silently submit wrong data without raising) as the page evolves. |
 | No parameterization | The POC's converter bakes the *literal* value from one run (e.g. "myname") into `input_text`. A real cache entry needs to serve the same task with different `input_parameters` values on every run, not just replay the one it was seeded with. |
 
-## 3. Cache key design
+## Cache Key Design
 
 The naive key is `hash(url + task_text)`. Two refinements matter:
 
 - **Parameterize, don't literal-bake.** Optexity's schema already supports variable substitution (`{email[0]}` - see `01_optexity_end_to_end_understanding.md` §3-4). The POC converter (`02_implementation_plan.md` Phase 4) doesn't do this - it writes `step.value` directly. A production converter needs to correlate each cached step's `value` against the *originating* `agentic_task`'s task string (which itself was built from `input_parameters`, e.g. `"fill full name as {name[0]}"`) and reconstruct the templated form. This turns one seed run into an automation that serves every future value of that parameter, not just the one it happened to see first - the actual point of caching a *workflow*, not a *transcript*.
 - **Fingerprint the DOM shape, not just the URL.** The same URL can render meaningfully different DOM for different account states, feature flags, or A/B tests. A mismatched DOM shape correctly misses the cache and falls back to agentic rather than replaying a locator set built for a different page variant.
 
-## 4. Proposed architecture
+## Proposed Architecture
 
 ```mermaid
 graph TD;
-    Req[agentic_task node execution request] --> Lookup[Cache Lookup Service<br/>key = hash(url, task_text, dom_fingerprint)]
+    Req[agentic_task node execution request] --> Lookup[Cache Lookup Service]
 
     Lookup -- hit --> Replay[Replay cached, parameterized automation]
     Lookup -- miss --> RunAgentic[Run agentic + Phase 2 caching hook]
 
-    RunAgentic --> Filter[Filter + Converter<br/>produce *candidate* automation]
+    RunAgentic --> Filter[Filter + Converter]
 
-    Replay -- node fails --> SelfHeal[Self-healing loop<br/>Phase 7b]
+    Replay -- node fails --> SelfHeal[Self-healing loop]
 
-    Filter --> Promo[Promotion Gate:<br/>shadow-run candidate N times]
+    Filter --> Promo[Promotion Gate]
 
-    Promo -- passes threshold --> DB[Two-tier Production Cache Store:<br/>Redis: lookup, TTL<br/>Postgres: automation_json, status]
+    Promo -- passes threshold --> DB[Production Cache Store]
 
-    DB -- feeds --> Analytics[Task Analytics<br/>Dashboard]
+    DB -- feeds --> Analytics[Task Analytics]
 
-    Analytics -- auto-invalidate on fail rate --> MissCache[Next run misses cache<br/>re-learns via agentic + recache]
+    Analytics -- auto-invalidate on fail rate --> MissCache[Invalidate & Re-learn]
 ```
 
 The deliberate design choice here: **reuse what Optexity already has** (the automation store behind `Task.automation`, and the existing Task Analytics dashboard) rather
 than standing up a parallel cache database and a parallel monitoring system. The new pieces are only the lookup step, the promotion gate, and the parameterization logic in
 the converter - everything else already exists in the platform.
 
-## 5. Promotion gate and the safer default
+## Promotion Gates
 
 Rather than a hard cutover ("replace this agentic node with the cached automation the moment one candidate exists"), the safer production default is:
 
@@ -59,11 +57,11 @@ Rather than a hard cutover ("replace this agentic node with the cached automatio
 
 This mirrors the same asymmetry already designed into Optexity's own schema - `command` first (deterministic, fast), `prompt_instructions` as an AI fallback when the locator fails (`01_optexity_end_to_end_understanding.md` §4-5). Production caching is that same pattern applied one level up: cached automation first, agentic as the fallback when the cache is wrong.
 
-## 6. Multi-tenancy note
+## Multi-Tenancy
 
 If this platform serves multiple customers/environments against nominally "the same" site, a single global cache entry per `(url, task)` will not generalize - different tenants can have different account states or feature flags producing different DOM shapes. The DOM-fingerprint component of the cache key (Section 3) is the first line of defense; if fingerprints diverge often enough per tenant, the key should be namespaced per tenant rather than assuming a global cache automatically applies everywhere.
 
-## 7. Which cache, concretely - and a reference implementation
+## Cache Storage Tiers
 
 The direct answer: **two tiers, not one.**
 
@@ -78,7 +76,7 @@ This is a standard **cache-aside** pattern: check Redis first; on a pointer hit,
 
 **This does introduce one genuinely new piece of infrastructure** - Redis - which the "reuse everything" framing in Section 4 slightly understates. It's called out explicitly here rather than glossed over: everything *except* the fast-lookup layer reuses existing Optexity infrastructure (the automation database, Task Analytics), but a low-latency shared lookup cache is new.
 
-### 7a. Postgres table
+### Postgres Implementation
 
 ```sql
 CREATE TABLE cached_automations (
@@ -95,7 +93,7 @@ CREATE TABLE cached_automations (
 );
 ```
 
-### 7b. Cache key (parameterized per Section 3, not literal-baked)
+### Key Construction
 
 ```python
 import hashlib
@@ -108,7 +106,7 @@ def build_cache_key(url: str, task_text: str, dom_fingerprint: str) -> str:
 
 `dom_fingerprint` is computed from whatever browser-use's selector map exposes at the start of the run (see `browser_use_codebase_understanding.md` §2) - e.g. a hash of the sorted set of `(role, accessible_name)` pairs for visible interactive elements. Its exact source needs the same "confirm in your local clone" treatment as the rest of the browser-use integration.
 
-### 7c. Redis client wrapper
+### Redis Client
 
 ```python
 import json
@@ -139,7 +137,7 @@ class AutomationCacheClient:
         self._r.delete(f"{cache_key}:stats")
 ```
 
-### 7d. Lookup-before-run flow
+### Lookup Flow
 
 ```python
 PROMOTION_SUCCESS_THRESHOLD = 5
@@ -187,7 +185,7 @@ def record_outcome(cache_key: str, db_id: int, success: bool,
 
 **Done-check (if this were actually built):** seed one candidate, replay it 5 times successfully - confirm `record_outcome` returns `"promoted"` on the 5th call and the Postgres row's `status` flips; then force one failure on a promoted entry and confirm it flips to `"deprecated"` and the Redis pointer is gone, so the very next lookup misses and re-learns via `run_agentic_and_convert`.
 
-### 7e. Optional, at higher scale: a Bloom filter to skip the Redis round-trip
+### Bloom Filter Optimization
 
 Not needed for the hackathon or a first production rollout - a Redis `GET` is already sub-millisecond. This only earns its keep once request volume is high enough that avoiding the network hop to Redis itself matters. Included here because it's a legitimate next optimization, not because the design above requires it.
 
@@ -247,6 +245,6 @@ def get_or_learn_automation_with_bloom(url, task_text, dom_fingerprint,
 
 **Done-check (if this were actually built):** seed one candidate, replay it 5 times successfully - confirm `record_outcome` returns `"promoted"` on the 5th call and the Postgres row's `status` flips; then force one failure on a promoted entry and confirm it flips to `"deprecated"` and the Redis pointer is gone, so the very next lookup misses and re-learns via `run_agentic_and_convert`.
 
-## 8. What ships in this hackathon vs. what's described here
+## Scope Checklist
 
 Everything in `02_implementation_plan.md` Phases 1-7 is meant to be buildable in the 1-3 hour window, including the bonus phases. This document - including Section 7's Redis/Postgres implementation - is intentionally *not* part of that build. It's the answer to "what's next," so the demo has a credible answer for "is this just a script, or does it point somewhere real."
