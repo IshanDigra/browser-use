@@ -88,3 +88,4 @@ plot.py
 cache*.jsonl
 test_automation*.json
 Assignment/
+memory-cache-docs/02_design_decisions_and_tradeoffs.md

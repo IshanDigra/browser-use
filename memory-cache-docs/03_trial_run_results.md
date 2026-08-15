@@ -180,8 +180,9 @@ doing the full agentic run anyway. Three distinct bugs sat behind it:
    field nothing under `optexity/inference` reads, so that node had **no locator at all**.
 3. No settle time after a step that changes the page.
 
-All three are fixed (see [02_design_decisions_and_tradeoffs.md](02_design_decisions_and_tradeoffs.md)
-§3 for the xpath field, §4 for `evaluate`, and "The rest" for navigation settle time). `evaluate` is now
+All three are fixed: the hook now reads the `code` parameter, xpath is emitted as a
+`locator("xpath=...")` command rather than into the unread `xpath` field, and a step whose
+`page_url_before` differs from the next one's gets a longer settle time. `evaluate` is now
 excluded from the agent's toolset, so the work has to go through real clicks and typing, which the
 hook can record.
 

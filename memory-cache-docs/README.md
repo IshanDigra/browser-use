@@ -40,7 +40,6 @@ schema into this repo.
 | Doc | What it answers |
 |---|---|
 | [01_what_i_implemented.md](01_what_i_implemented.md) | What was built end to end, and what changed once it was run |
-| [02_design_decisions_and_tradeoffs.md](02_design_decisions_and_tradeoffs.md) | Every non-obvious choice and the alternative rejected |
 | [03_trial_run_results.md](03_trial_run_results.md) | Real caches, generated automations, measured numbers |
 | [04_future_production_considerations.md](04_future_production_considerations.md) | What is missing: there is no cache *lookup* step yet |
 | [05_setup_guide_feedback.md](05_setup_guide_feedback.md) | Setup notes: two things that fail silently, worth adding to the brief |
